@@ -1,0 +1,88 @@
+const Task = require("../models/Task");
+const User = require("../models/User"); // ← add this import
+
+// Create task (Admin) — with user assignment
+exports.createTask = async (req, res) => {
+  try {
+    const { title, description, assignedTo } = req.body;
+
+    // If assignedTo provided, verify that user exists
+    if (assignedTo) {
+      const userExists = await User.findById(assignedTo);
+      if (!userExists) {
+        return res.status(404).json({ error: "Assigned user not found" });
+      }
+    }
+
+    const task = await Task.create({
+      title,
+      description,
+      assignedTo: assignedTo || null,
+      createdBy: req.user.id,
+    });
+
+    const populated = await task.populate([
+      { path: "assignedTo", select: "name email" },
+      { path: "createdBy", select: "name" },
+    ]);
+
+    res.status(201).json(populated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Get all tasks
+exports.getTasks = async (req, res) => {
+  try {
+    const tasks = await Task.find()
+      .populate("assignedTo", "name email")
+      .populate("createdBy", "name");
+
+    res.json(tasks);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Update task status (or reassign)
+exports.updateTask = async (req, res) => {
+  try {
+    const { status, assignedTo } = req.body;
+
+    // If reassigning, verify the new user exists
+    if (assignedTo) {
+      const userExists = await User.findById(assignedTo);
+      if (!userExists) {
+        return res.status(404).json({ error: "Assigned user not found" });
+      }
+    }
+
+    const task = await Task.findByIdAndUpdate(
+      req.params.id,
+      { ...(status && { status }), ...(assignedTo && { assignedTo }) },
+      { new: true }
+    );
+
+    if (!task) return res.status(404).json({ error: "Task not found" });
+
+    await task.populate([
+      { path: "assignedTo", select: "name email" },
+      { path: "createdBy", select: "name" },
+    ]);
+
+    res.json(task);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Get all users — for the admin's assign dropdown in the frontend
+exports.getUsers = async (req, res) => {
+  try {
+    const users = await User.find({}, "name email role");
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};

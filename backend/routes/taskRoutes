@@ -1,0 +1,23 @@
+const router = require("express").Router();
+const auth = require("../middleware/auth");
+const role = require("../middleware/role");
+const {
+  createTask,
+  getTasks,
+  updateTask,
+  getUsers,        // ← import the new controller
+} = require("../controllers/taskController");
+
+// Admin only — create task
+router.post("/", auth, role("admin"), createTask);
+
+// Admin only — get all users for the assign dropdown
+router.get("/users", auth, role("admin"), getUsers);
+
+// All logged-in users — get all tasks
+router.get("/", auth, getTasks);
+
+// Admin only — update task (status or reassign)
+router.put("/:id", auth, role("admin"), updateTask);
+
+module.exports = router;
